@@ -6,9 +6,6 @@
 
 This project involves the development of an AI-driven system that processes text-based consumer complaints, categorizes them into product and sub-product categories, and stores the data in a PostgreSQL database. The system is enhanced with a Retrieval-Augmented Generation (RAG) pipeline using a vector database to retrieve and compare similar complaints based on textual similarity.
 
-**Why Ruby Card Founders Will Be Happy:**  
-This project aligns with Ruby's commitment to leveraging AI for improved financial decision-making. By categorizing and analyzing consumer complaints, Ruby can gain valuable insights into customer issues, enhancing product offerings and customer satisfaction. The integration of a RAG pipeline and vector database reflects a cutting-edge approach, making it a valuable asset for Ruby's financial health monitoring tools.
-
 ## Tech Stack
 
 - **Frontend:** Basic HTML/CSS for user input forms (if needed)
