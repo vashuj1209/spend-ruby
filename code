@@ -1,0 +1,108 @@
+rails new complaint_categorization_system --api -d postgresql
+cd complaint_categorization_system
+
+rails generate model Complaint content:text category:string sub_category:string vector:json
+rails db:create
+rails db:migrate
+
+rails generate controller Complaints
+
+class ComplaintsController < ApplicationController
+  require 'openai'
+
+  def create
+    # Assuming OpenAI API key is stored in an environment variable
+    client = OpenAI::Client.new(api_key: ENV['OPENAI_API_KEY'])
+
+    content = complaint_params[:content]
+
+    # Call OpenAI API to categorize the complaint
+    response = client.completions(
+      engine: "davinci-codex",
+      prompt: "Categorize this complaint: #{content}",
+      max_tokens: 50
+    )
+
+    category, sub_category = extract_category(response['choices'][0]['text'])
+
+    # Generate vector for RAG pipeline
+    vector = generate_vector(content)
+
+    # Create and save the complaint in the database
+    @complaint = Complaint.new(content: content, category: category, sub_category: sub_category, vector: vector)
+
+    if @complaint.save
+      render json: @complaint, status: :created
+    else
+      render json: @complaint.errors, status: :unprocessable_entity
+    end
+  end
+
+  private
+
+  def complaint_params
+    params.require(:complaint).permit(:content)
+  end
+
+  def extract_category(text)
+    # Implement logic to extract category and sub-category from the OpenAI response
+    # This is a placeholder
+    category = "Example Category"
+    sub_category = "Example Sub-category"
+    [category, sub_category]
+  end
+
+  def generate_vector(content)
+    # Generate a vector for the content using OpenAI or another service
+    # Placeholder vector generation
+    [0.1, 0.2, 0.3, 0.4, 0.5]
+  end
+end
+
+Rails.application.routes.draw do
+  resources :complaints, only: [:create, :index, :show]
+end
+rails db:migrate
+# app/services/vector_database_service.rb
+class VectorDatabaseService
+  def initialize
+    @client = Pinecone::Client.new(api_key: ENV['PINECONE_API_KEY'])
+    @index = @client.index("complaints")
+  end
+
+  def store_vector(complaint_id, vector)
+    @index.upsert(vectors: [{ id: complaint_id.to_s, values: vector }])
+  end
+
+  def search_similar(vector, top_k = 5)
+    @index.query(vector: vector, top_k: top_k)
+  end
+end
+class ComplaintsController < ApplicationController
+  def create
+    content = complaint_params[:content]
+    category, sub_category = extract_category(content)
+    vector = generate_vector(content)
+
+    @complaint = Complaint.new(content: content, category: category, sub_category: sub_category, vector: vector)
+
+    if @complaint.save
+      vector_service = VectorDatabaseService.new
+      vector_service.store_vector(@complaint.id, vector)
+
+      render json: @complaint, status: :created
+    else
+      render json: @complaint.errors, status: :unprocessable_entity
+    end
+  end
+
+  def similar
+    @complaint = Complaint.find(params[:id])
+    vector_service = VectorDatabaseService.new
+    similar_complaints = vector_service.search_similar(@complaint.vector)
+
+    render json: similar_complaints
+  end
+end
+rails server
+curl -X POST -H "Content-Type: application/json" -d '{"content":"My bank account was overcharged"}' http://localhost:3000/complaints
